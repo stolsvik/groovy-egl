@@ -64,16 +64,16 @@ import java.text.DecimalFormatSymbols
  * see the results on the run times). Also, instead of a ".forEach{}"-loop, check out how the "for(int i;...;i++)"-loop
  * handles.</i> 
  * <p>
- * <b>This code is hereby put in the Public Domain - or can be licensed using the BSD license.</b>
+ * <b>The code in this file is hereby put in the Public Domain - or can be licensed using the BSD license.</b>
  * 
  * @author Endre Stølsvik, 2014 - http://endre.stolsvik.com/
  */
 @CompileStatic
 class ExploratoryGroovyLooper {
 
-    static String SETUP_DONE = "SETUP_DONE"
-    static DecimalFormat df = new DecimalFormat('# ##0.000;-#', new DecimalFormatSymbols(Locale.US));
-    static ThreadLocal<Boolean> __alreadyInvoked = new ThreadLocal<>()
+    private static String SETUP_DONE = "SETUP_DONE"
+    private static DecimalFormat df = new DecimalFormat('# ##0.000;-#', new DecimalFormatSymbols(Locale.US));
+    private static ThreadLocal<Boolean> __alreadyInvoked = new ThreadLocal<>()
 
     // :: The Delegate should have been its own inner class, but due to GROOVY-5875 it can't
     private Binding binding
@@ -122,16 +122,20 @@ class ExploratoryGroovyLooper {
 
         Binding binding = new Binding()
 
-        def b = new ExploratoryGroovyLooper(binding)
-        keyValueClosure.delegate = b;
+        def egl = new ExploratoryGroovyLooper(binding)
+        keyValueClosure.delegate = egl
         keyValueClosure.resolveStrategy = Closure.DELEGATE_FIRST
+        println "Running the setup closure.."
+        long nanosStart = System.nanoTime()
         keyValueClosure()
+        double msTaken = (System.nanoTime() - nanosStart) / 1000000d;
+        println ".. setup closure took ${df.format(msTaken)} ms"
 
         loop(thisScript, binding)
     }
 
     /**
-     * A more basic, and muce more boring, variant of {@link #loop(Script, Closure)} - which is used internally by
+     * A more basic, and much more boring, variant of {@link #loop(Script, Closure)} - which is used internally by
      * that method.
      * <h2>Example</h2>
      * You for example make a file "TransactionExploratoryScript_Binding.groovy":
@@ -166,9 +170,8 @@ class ExploratoryGroovyLooper {
             println "---------------------------------------------------------------------------------------------"
             long nanosStart = System.nanoTime()
             GroovyShell shell = new GroovyShell(binding)
-            Object value;
             try {
-                value = shell.evaluate(new File(thisScriptPath))
+                def value = shell.evaluate(new File(thisScriptPath))
                 double msTaken = (System.nanoTime() - nanosStart) / 1000000d;
                 println "-----------\n  Took ${df.format(msTaken)} ms - Script returned: $value"
             }

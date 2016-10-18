@@ -1,5 +1,11 @@
+# Eclipse
 .settings
 .classpath
 .project
-bin
-eclipse-build
+/build-eclipse/
+/bin/
+
+# Idea
+/out/
+.idea
+/*.iml
