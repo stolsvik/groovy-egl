@@ -7,7 +7,8 @@ import com.stolsvik.tools.GroovyDynaCompile
  */
 class GdcExample {
     static void main(String[] args) {
-        GroovyDynaCompile cl = GroovyDynaCompile.fromCl('DynamicallyCompiledGroovy.groovy')
+        GroovyDynaCompile cl = GroovyDynaCompile.fromClassLoader('DynamicallyCompiledGroovy.groovy')
+        cl.setPostInstantiationClosure { println "Class of the loaded instance: ${it.getClass()}@${Integer.toHexString(System.identityHashCode(it.getClass()))}"}
         while (true) {
             println cl.getInstance().someMethod()
             Thread.sleep(2000)

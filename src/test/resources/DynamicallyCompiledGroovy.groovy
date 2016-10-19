@@ -1,4 +1,4 @@
-package com.stolsvik.tools
+package test
 
 /**
  * Created by endre on 19.10.16.
@@ -6,7 +6,7 @@ package com.stolsvik.tools
 class DynamicallyCompiledGroovy {
 
     String someMethod() {
-        return getMore() + ' Tralala!'
+        return getMore() + ' World!'
     }
 
     private String getMore() {
