@@ -8,7 +8,7 @@ import java.text.DecimalFormatSymbols
 /**
  * <b>tl;dr: Jump to the Example.</b>
  * <p>
- * If you have a situation where some costly setup code must be run before you can experiment on the result 
+ * If you have a situation where some costly setup code must be run before you can experiment on the result
  * (e.g. load several million transactions into memory, or spinning up a big Spring context), and then want to
  * code-experiment on the result, e.g. summing this way and that through all those transaction, you typically end up
  * with very many restarts, giving the setup-hit each time. Even if you get that down to just a few seconds, the
@@ -42,7 +42,7 @@ import java.text.DecimalFormatSymbols
  *
  * // Just to get proper IDE typing help inside the script
  * Transaction[] txs = _txs
- * 
+ *
  * def sum = 0
  * txs.forEach{ t -> sum += t.amount }
  * println sum
@@ -62,23 +62,24 @@ import java.text.DecimalFormatSymbols
  * it must return an object. But you can force it through by making your own DoubleProvider interface which
  * have an e.g. "double call(V v)" method, and using {@literal @}CompileStatic liberally (You'll instantly
  * see the results on the run times). Also, instead of a ".forEach{}"-loop, check out how the "for(int i;...;i++)"-loop
- * handles.</i> 
+ * handles.</i>
  * <p>
  * <b>The code in this file is hereby put in the Public Domain - or can be licensed using the BSD license.</b>
- * 
+ *
  * @author Endre Stølsvik, 2014 - http://endre.stolsvik.com/
  */
 @CompileStatic
 class ExploratoryGroovyLooper {
 
     private static String SETUP_DONE = "SETUP_DONE"
-    private static DecimalFormat df = new DecimalFormat('# ##0.000;-#', new DecimalFormatSymbols(Locale.US));
+    private static DecimalFormat DF = new DecimalFormat('#,##0.000', new DecimalFormatSymbols(Locale.US));
     private static ThreadLocal<Boolean> __alreadyInvoked = new ThreadLocal<>()
 
     // :: The Delegate should have been its own inner class, but due to GROOVY-5875 it can't
     private Binding binding
+
     ExploratoryGroovyLooper(Binding binding) {
-        this.binding = binding;
+        this.binding = binding
     }
     def methodMissing(String name, Object[] args) {
         this.binding.setProperty(name, args[0])
@@ -95,11 +96,11 @@ class ExploratoryGroovyLooper {
      * You for example make a file "TransactionExploratoryScript_Closure.groovy":
      * <pre>
      * import com.stolsvik.tools.ExploratoryGroovyLooper
-     * ExploratoryGroovyLooper.loop(this) { 
+     * ExploratoryGroovyLooper.loop(this) {
      *     test1 = "Property Set style"
      *     test2("Method Call style")
      *     test3 "Also Method Call style w/o parens"
-     *     
+     *
      *     _txs = Transactions.loadAll()
      * }
      *
@@ -108,7 +109,7 @@ class ExploratoryGroovyLooper {
      * println test3
      * // Just to get proper IDE typing help inside the script
      * Transaction[] txs = _txs
-     * 
+     *
      * def sum = 0
      * txs.forEach{ t -> sum += t.amount }
      * println sum
@@ -125,11 +126,11 @@ class ExploratoryGroovyLooper {
         def egl = new ExploratoryGroovyLooper(binding)
         keyValueClosure.delegate = egl
         keyValueClosure.resolveStrategy = Closure.DELEGATE_FIRST
-        println "Running the setup closure.."
+        println "EGL: Running the setup closure.."
         long nanosStart = System.nanoTime()
         keyValueClosure()
         double msTaken = (System.nanoTime() - nanosStart) / 1000000d;
-        println ".. setup closure took ${df.format(msTaken)} ms"
+        println "EGL: .. setup closure took ${DF.format(msTaken)} ms"
 
         loop(thisScript, binding)
     }
@@ -148,7 +149,7 @@ class ExploratoryGroovyLooper {
      *
      * // Just to get proper IDE typing help inside the script
      * Transaction[] txs = _txs
-     * 
+     *
      * def sum = 0
      * txs.forEach{ t -> sum += t.amount }
      * println sum
@@ -164,33 +165,65 @@ class ExploratoryGroovyLooper {
 
         def thisScriptPath = thisScript.getClass().protectionDomain.codeSource.location.path
 
-        while (true) {
-            println "\n\n============================================================================================="
-            println " Running script '$thisScriptPath', class:${thisScript.getClass().getName()}"
-            println "---------------------------------------------------------------------------------------------"
-            long nanosStart = System.nanoTime()
-            GroovyShell shell = new GroovyShell(binding)
-            try {
-                def value = shell.evaluate(new File(thisScriptPath))
-                double msTaken = (System.nanoTime() - nanosStart) / 1000000d;
-                println "-----------\n  Took ${df.format(msTaken)} ms - Script returned: $value"
-            }
-            catch (Throwable t) {
-                double msTaken = (System.nanoTime() - nanosStart) / 1000000d;
-                System.err.println("WHOOPS! GOT A THROWABLE!   (${df.format(msTaken)} ms since start)")
-                sleep 100 // To flush any std-out output
-                t.printStackTrace()
-                sleep 100 // To flush any std-err output
-            }
-            println "---------------------------------------------------------------------------------------------"
+        String userInput = "FIRST"
 
-            BufferedReader br = new BufferedReader(new InputStreamReader(System.in))
-            print "\nHit enter to run again, or 'x' and enter to exit."
-            def userInput = br.readLine()
-            if (userInput == "x") {
-                System.exit(0)
+        while (true) {
+            binding.setProperty('userInput', userInput)
+            println "\n\n============================================================================================="
+            println " Running script '$thisScriptPath', class:${thisScript.class.name}, userInput:$userInput"
+            println "---------------------------------------------------------------------------------------------"
+            Thread eglThread = new Thread({
+                __alreadyInvoked.set(true)
+                long nanosStart = System.nanoTime()
+                GroovyShell shell = new GroovyShell(binding)
+                try {
+                    def value = shell.evaluate(new File(thisScriptPath))
+                    println "---------------------------------------------------------------------------------------------"
+                    println "  EGL Runner DONE! Took ${time(nanosStart)} - Script returned: $value"
+                }
+                catch (InterruptedException ie) {
+                    println "---------------------------------------------------------------------------------------------"
+                    println "  EGL Runner INTERRUPTED! Took ${time(nanosStart)}: ${ie.message}"
+                    ie.printStackTrace(System.out)
+                }
+                catch (Throwable t) {
+                    println "---------------------------------------------------------------------------------------------"
+                    println "  EGL Runner raised EXCEPTION! Took ${time(nanosStart)}"
+                    sleep 100 // To flush any std-out output
+                    t.printStackTrace()
+                    sleep 100 // To flush any std-err output
+                }
+                println "---------------------------------------------------------------------------------------------"
+                println "\nExiting EGL Runner Thread: Hit enter to run again!"
+            }, "egl runner")
+            eglThread.start()
+
+            while (true) {
+                if (eglThread.isAlive()) {
+                    println "\nEGL Thread running: While running, type 'x' and enter to interrupt EGL Runner thread."
+                }
+                else {
+                    println "\nEGL Thread finished: Hit enter to run again!"
+                }
+                BufferedReader br = new BufferedReader(new InputStreamReader(System.in))
+                userInput = br.readLine()
+                if (userInput == "x") {
+                    println "EGL: Interrupting EGL Runner thread!"
+                    eglThread.interrupt()
+                    Thread.sleep(500)
+                    continue
+                }
+                if (!eglThread.isAlive()) {
+                    break
+                }
             }
         }
+    }
+
+    private static String time(long nanosStart) {
+        double msTaken = (System.nanoTime() - nanosStart) / 1000000d
+        double minTaken = msTaken / (1000d * 60d)
+        return "${DF.format(msTaken)} ms (${DF.format(minTaken)} min)"
     }
 
     /**
